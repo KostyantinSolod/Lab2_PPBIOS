@@ -1,6 +1,7 @@
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ParallelSum {
     static int[] matrix;
@@ -8,10 +9,15 @@ public class ParallelSum {
     static int threadCount;
     static BlockingQueue<int[]> tasksQueue;
     static Semaphore waveSemaphore;
+    static AtomicBoolean taskAvailable;
 
     static void worker() {
         while (true) {
             try {
+                while (!taskAvailable.get() && tasksQueue.isEmpty()) {
+                    Thread.sleep(1);
+                }
+
                 int[] task = tasksQueue.take();
                 if (task[0] == -1) break;
 
@@ -19,7 +25,6 @@ public class ParallelSum {
                 int oppositeIndex = task[1];
 
                 matrix[i] += matrix[oppositeIndex];
-
 
                 waveSemaphore.release();
             } catch (InterruptedException e) {
@@ -39,6 +44,7 @@ public class ParallelSum {
                 tasksQueue.put(new int[]{i, oppositeIndex});
             }
 
+            taskAvailable.set(true);
 
             for (int i = 0; i < halfLength; i++) {
                 waveSemaphore.acquire();
@@ -59,20 +65,23 @@ public class ParallelSum {
         }
         currentLength = matrix.length;
 
-        threadCount = 6;
+        threadCount = 100;
 
         tasksQueue = new ArrayBlockingQueue<>(currentLength);
+        taskAvailable = new AtomicBoolean(false);
 
         Thread[] workers = new Thread[threadCount];
         for (int i = 0; i < threadCount; i++) {
             workers[i] = new Thread(ParallelSum::worker);
             workers[i].start();
         }
+
         calculateSum();
 
         for (int i = 0; i < threadCount; i++) {
             tasksQueue.put(new int[]{-1, -1});
         }
+
         for (Thread worker : workers) {
             worker.join();
         }
