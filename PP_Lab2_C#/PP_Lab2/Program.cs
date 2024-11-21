@@ -1,31 +1,42 @@
-﻿using System;
-using System.Collections.Concurrent;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 class Program
 {
     static int[] matrix;
     static int currentLength;
     static int threadCount;
-    static BlockingCollection<(int, int)> tasksQueue;
-    static SemaphoreSlim waveSemaphore;
-    static ManualResetEventSlim taskAvailable;  
+    static SemaphoreSlim taskSemaphore; // Семафор для обробки завдань
+    static Queue<(int, int)> tasksQueue; // Черга завдань для потоків
+    static object lockObject = new object(); // Для синхронізації доступу до черги завдань
 
+    // Потік, який обробляє пару елементів масиву
     static void Worker()
     {
         while (true)
         {
-            taskAvailable.Wait();  
-            if (tasksQueue.TryTake(out var task))
+            (int, int) task;
+            lock (lockObject)
             {
-                if (task.Item1 == -1) break;
-
-                int i = task.Item1;
-                int oppositeIndex = task.Item2;
-
-                matrix[i] += matrix[oppositeIndex];
-                waveSemaphore.Release();  
+                if (tasksQueue.Count > 0)
+                {
+                    task = tasksQueue.Dequeue(); // Бере завдання з черги
+                }
+                else
+                {
+                    break; // Якщо завдань більше немає, завершуємо роботу потоку
+                }
             }
+
+            int i = task.Item1;
+            int oppositeIndex = task.Item2;
+
+            matrix[i] += matrix[oppositeIndex];  // Додаємо пару елементів
+
+            taskSemaphore.Release();  // Вивільняємо слот для наступного потоку
         }
     }
 
@@ -34,27 +45,47 @@ class Program
         while (currentLength > 1)
         {
             int halfLength = currentLength / 2;
-            waveSemaphore = new SemaphoreSlim(0, halfLength);
+            tasksQueue = new Queue<(int, int)>();  // Очищаємо чергу завдань
 
+            // Додаємо завдання до черги
             for (int i = 0; i < halfLength; i++)
             {
                 int oppositeIndex = currentLength - i - 1;
-                tasksQueue.Add((i, oppositeIndex));
+                tasksQueue.Enqueue((i, oppositeIndex));  // Додаємо пару індексів
             }
 
-            taskAvailable.Set();
+            // Створюємо пул потоків і кожен потік працює із завданнями
+            taskSemaphore = new SemaphoreSlim(0, halfLength);  // Початкове обмеження на кількість завдань
 
+            // Створюємо потоки
+            var tasks = new Task[threadCount];
+            for (int i = 0; i < threadCount; i++)
+            {
+                tasks[i] = Task.Run(() => Worker()); // Кожен потік виконує Worker
+            }
+
+            // Чекаємо, поки всі потоки оброблять пари
             for (int i = 0; i < halfLength; i++)
             {
-                waveSemaphore.Wait();
+                taskSemaphore.Wait();  // Очікуємо, поки потік звільнить слот
             }
 
+            // Якщо довжина непарна, додаємо центральний елемент
             if (currentLength % 2 == 1)
             {
-                matrix[halfLength - 1] += matrix[halfLength];
+                matrix[halfLength] += matrix[currentLength - 1];
             }
 
-            currentLength = halfLength;
+            // Оновлюємо довжину масиву
+            currentLength = (currentLength + 1) / 2;
+
+            // Виводимо масив після кожної хвилі
+            Console.WriteLine("Масив після обробки:");
+            foreach (var item in matrix.Take(currentLength))
+            {
+                Console.Write(item + " ");
+            }
+            Console.WriteLine();
         }
     }
 
@@ -63,37 +94,13 @@ class Program
         matrix = new int[50000];
         for (int i = 0; i < matrix.Length; i++)
         {
-            matrix[i] = i + 1;
+            matrix[i] = i + 1;  // Заповнюємо масив значеннями
         }
         currentLength = matrix.Length;
 
-        threadCount = 9;  
+        threadCount = 4;  // Використовуємо 4 потоки (можна налаштувати)
 
-        tasksQueue = new BlockingCollection<(int, int)>();
-        taskAvailable = new ManualResetEventSlim(false);  
-
-        
-        Thread[] workers = new Thread[threadCount];
-        for (int i = 0; i < threadCount; i++)
-        {
-            workers[i] = new Thread(Worker);
-            workers[i].Start();  
-        }
-
-        
         CalculateSum();
-
-        for (int i = 0; i < threadCount; i++)
-        {
-            tasksQueue.Add((-1, -1));
-        }
-
-        taskAvailable.Set();
-
-        foreach (var worker in workers)
-        {
-            worker.Join();
-        }
 
         Console.WriteLine("Загальна сума елементів масиву: " + matrix[0]);
     }
