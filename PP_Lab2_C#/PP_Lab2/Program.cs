@@ -9,11 +9,10 @@ class Program
     static int[] matrix;
     static int currentLength;
     static int threadCount;
-    static SemaphoreSlim taskSemaphore; // Семафор для обробки завдань
-    static Queue<(int, int)> tasksQueue; // Черга завдань для потоків
-    static object lockObject = new object(); // Для синхронізації доступу до черги завдань
+    static SemaphoreSlim taskSemaphore; 
+    static Queue<(int, int)> tasksQueue; 
+    static object lockObject = new object(); 
 
-    // Потік, який обробляє пару елементів масиву
     static void Worker()
     {
         while (true)
@@ -23,20 +22,20 @@ class Program
             {
                 if (tasksQueue.Count > 0)
                 {
-                    task = tasksQueue.Dequeue(); // Бере завдання з черги
+                    task = tasksQueue.Dequeue(); 
                 }
                 else
                 {
-                    break; // Якщо завдань більше немає, завершуємо роботу потоку
+                    break; 
                 }
             }
 
             int i = task.Item1;
             int oppositeIndex = task.Item2;
 
-            matrix[i] += matrix[oppositeIndex];  // Додаємо пару елементів
+            matrix[i] += matrix[oppositeIndex];  
 
-            taskSemaphore.Release();  // Вивільняємо слот для наступного потоку
+            taskSemaphore.Release();  
         }
     }
 
@@ -45,41 +44,34 @@ class Program
         while (currentLength > 1)
         {
             int halfLength = currentLength / 2;
-            tasksQueue = new Queue<(int, int)>();  // Очищаємо чергу завдань
+            tasksQueue = new Queue<(int, int)>();  
 
-            // Додаємо завдання до черги
             for (int i = 0; i < halfLength; i++)
             {
                 int oppositeIndex = currentLength - i - 1;
-                tasksQueue.Enqueue((i, oppositeIndex));  // Додаємо пару індексів
+                tasksQueue.Enqueue((i, oppositeIndex)); 
             }
 
-            // Створюємо пул потоків і кожен потік працює із завданнями
-            taskSemaphore = new SemaphoreSlim(0, halfLength);  // Початкове обмеження на кількість завдань
+            taskSemaphore = new SemaphoreSlim(0, halfLength);  
 
-            // Створюємо потоки
             var tasks = new Task[threadCount];
             for (int i = 0; i < threadCount; i++)
             {
-                tasks[i] = Task.Run(() => Worker()); // Кожен потік виконує Worker
+                tasks[i] = Task.Run(() => Worker()); 
             }
 
-            // Чекаємо, поки всі потоки оброблять пари
             for (int i = 0; i < halfLength; i++)
             {
-                taskSemaphore.Wait();  // Очікуємо, поки потік звільнить слот
+                taskSemaphore.Wait();  
             }
 
-            // Якщо довжина непарна, додаємо центральний елемент
             if (currentLength % 2 == 1)
             {
                 matrix[halfLength] += matrix[currentLength - 1];
             }
 
-            // Оновлюємо довжину масиву
             currentLength = (currentLength + 1) / 2;
 
-            // Виводимо масив після кожної хвилі
             Console.WriteLine("Масив після обробки:");
             foreach (var item in matrix.Take(currentLength))
             {
@@ -94,11 +86,11 @@ class Program
         matrix = new int[50000];
         for (int i = 0; i < matrix.Length; i++)
         {
-            matrix[i] = i + 1;  // Заповнюємо масив значеннями
+            matrix[i] = i + 1;  
         }
         currentLength = matrix.Length;
 
-        threadCount = 4;  // Використовуємо 4 потоки (можна налаштувати)
+        threadCount = 4; 
 
         CalculateSum();
 
