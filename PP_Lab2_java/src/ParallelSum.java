@@ -18,12 +18,11 @@ public class ParallelSum {
 
         @Override
         public void run() {
-            // Проходимо лише до середини, для кожної пари елементів
             for (int i = start; i < end; i++) {
                 int oppositeIndex = currentLength - i - 1;
                 if (i < oppositeIndex) {
-                    synchronized (matrix) { // Захищаємо масив від одночасного доступу
-                        matrix[i] += matrix[oppositeIndex]; // Додаємо елементи на протилежних індексах
+                    synchronized (matrix) { 
+                        matrix[i] += matrix[oppositeIndex]; 
                     }
                 }
             }
@@ -32,15 +31,14 @@ public class ParallelSum {
     }
 
     static void calculateSum() throws InterruptedException {
-        // Продовжуємо до тих пір, поки не зменшиться до одного елемента
         while (currentLength > 1) {
             System.out.println("=======================================================================================");
-            int halfLength = currentLength / 2; // Поділяємо на дві половини
-            CountDownLatch latch = new CountDownLatch(threadCount); // Лічильник завершення потоків
+            int halfLength = currentLength / 2;
+            CountDownLatch latch = new CountDownLatch(threadCount); 
 
             System.out.println("Поточна довжина масиву: " + currentLength);
 
-            int chunkSize = (halfLength + threadCount - 1) / threadCount; // Розподіляємо роботу між потоками
+            int chunkSize = (halfLength + threadCount - 1) / threadCount; 
 
             Thread[] threads = new Thread[threadCount];
             for (int threadId = 0; threadId < threadCount; threadId++) {
@@ -48,7 +46,7 @@ public class ParallelSum {
                 int end = Math.min(start + chunkSize, halfLength);
 
                 if (start >= halfLength) {
-                    latch.countDown();  // Якщо потік не працює (всі індекси оброблені), просто відразу звільняємо
+                    latch.countDown(); 
                     continue;
                 }
 
@@ -56,16 +54,14 @@ public class ParallelSum {
                 threads[threadId].start();
             }
 
-            latch.await(); // Чекаємо на завершення всіх потоків
+            latch.await(); 
 
-            // Якщо довжина непарна, додаємо центральний елемент
             if (currentLength % 2 == 1) {
                 matrix[halfLength] += matrix[currentLength - 1];
                 System.out.printf("Додаємо центральний елемент: %d -> %d\n",
                         matrix[halfLength], matrix[halfLength]);
             }
 
-            // Оновлюємо довжину для наступної ітерації
             currentLength = (currentLength + 1) / 2;
 
             System.out.println("Масив після обробки:");
@@ -77,16 +73,15 @@ public class ParallelSum {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        int n = 50000; // Розмір масиву
+        int n = 50000; 
         matrix = new int[n];
         for (int i = 0; i < n; i++) {
-            matrix[i] = i + 1;  // Ініціалізуємо масив числами від 1 до 50000
+            matrix[i] = i + 1;  
         }
         currentLength = matrix.length;
 
-        threadCount = Runtime.getRuntime().availableProcessors(); // Використання доступних ядер
+        threadCount = Runtime.getRuntime().availableProcessors(); 
 
-        // Початкова перевірка суми
         int initialSum = 0;
         for (int i = 0; i < n; i++) {
             initialSum += matrix[i];
@@ -95,7 +90,6 @@ public class ParallelSum {
 
         calculateSum();
 
-        // Перевірка результату
         System.out.println("Загальна сума елементів масиву: " + matrix[0]);
     }
 }
